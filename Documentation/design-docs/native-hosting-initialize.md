@@ -20,6 +20,19 @@ The API should allow these, doesn't have to support them all in the beginning. I
 ## New `hostfxr` APIs
 
 ### Initialize the host
+
+All the "initialize" functions will (unless it's one of the SDK scenarios):
+* Process the `.runtimeconfig.json`
+* Resolve framework references and find actual frameworks
+* Find the root framework (`Microsoft.NETCore.App`) and load the `hostpolicy` from it
+* The `hostpolicy` will then process all relevant `.deps.json` files and produce the TPA, native search paths and other artifacts.
+
+The functions will NOT load the CoreCLR runtime, they just prepare everything to the point where it can be loaded.
+
+The functions return a handle to initialized host:
+* The handle must be closed via `hostfxr_shutdown`.
+* The handle is not thread safe - it is only allowed to call functions on it from one thread at a time.
+
 ``` C++
 using hostfxr_handle = void *;
 
@@ -76,41 +89,43 @@ This function can be called multiple times in a process.
 * If it's called when no runtime is present, it will run through the steps to "initialize" the runtime (so resolving frameworks and so on).
 * If it's called when there already is CoreCLR in the process (loaded through the `hostfxr`, direct usage of `coreclr` is not supported), then the function determines if the specified runtime configuration is compatible with the existing runtime and frameworks. If it is, it returns a valid handle, otherwise it fails.
 
+It needs to be possible to call this function simultaneously from multiple threads at the same time as well.
+It also needs to be possible to call this function while there is an "app" initialized host and running inside the `hostfxr_run_app`.
+
 *TODO: What is the indication that there is no runtime in the process yet?*
-
-
-All the "initialize" functions will (unless it's one of the SDK scenarios):
-* Process the `.runtimeconfig.json`
-* Resolve framework references and find actual frameworks
-* Find the root framework (`Microsoft.NETCore.App`) and load the `hostpolicy` from it
-* The `hostpolicy` will then process all relevant `.deps.json` files and produce the TPA, native search paths and other artifacts.
-
-The functions will NOT load the CoreCLR runtime, they just prepare everything to the point where it can be loaded.
 
 
 ### Initialized host inspection and modification
 
 #### Runtime properties
 ``` C++
-using hostfxr_string_result_fn = void(*) (const char_t * value);
+int hostfxr_get_runtime_property(
+    const hostfxr_handle handle,
+    const char_t * name,
+    char_t * value_buffer,
+    size_t value_buffer_size,
+    size_t * value_buffer_used);
 
-int hostfxr_get_runtime_property(const hostfxr_handle handle, const char_t * name, hostfxr_string_result_fn value_result);
-int hostfxr_set_runtime_property(const hostfxr_handle handle, const char_t * name, const char_t * value);
+int hostfxr_set_runtime_property(
+    const hostfxr_handle handle,
+    const char_t * name,
+    const char_t * value);
 ```
 
 These functions allow the native host to inspect and modify runtime properties. After initialization the properties should contain everything which the hosting layer calculates. This gives the host the opportunity to inspect, modify and resolve any potential conflicts.
 * `handle` - the initialized host handle.
-* `name` - the name of the runtime property to get/set.
-* `value_result` - callback which is called with the value of the property.  
+* `name` - the name of the runtime property to get/set. Must not be `nullptr`.
 *TODO: Is this the right API - maybe it should use the "buffer, buffer size" approach where the caller supplies allocated memory instead*
-* `value` - the value of the property to set.  
-*TODO: Can we use `nullptr` to "unset" the property?*
+* `value` - the value of the property to set. When set to `nullptr` the property is "unset" - removed from the runtime property collection.
+* `value_buffer` - buffer to receive the value of the property
+* `value_buffer_size` - the size of the `value_buffer` is `char_t` units.
+* `value_buffer_used` - when successful contains number of `char_t` units used in the buffer (including the null terminator). If the specified `value_buffer_size` was too small, the function returns `HostApiBufferTooSmall` and sets the `value_buffer_used` to the minimum required size.
 
 Setting properties is only supported when the host was initialized without any runtime in the process.
 
-*TODO: Should there be a way to enumerate all the properties?*
+*TODO: Can we support getting properties when there is preexisting runtime?*
 
-*Maybe for the first release we don't support `hostfxr_get_runtime_property` as that requires the initialization to run all the way through to `hostpolicy` to calculate all properties correctly.*
+*TODO: Should there be a way to enumerate all the properties?*
 
 
 ### Start the runtime
@@ -123,6 +138,8 @@ Runs the application specified by the `hostfxr_initialize_for_app`. It is illega
 * `handle` - handle to the initialized host.
 
 The function will return only once the managed application exits.
+
+`hostfxr_run_app` cannot be used in combination with any other "run" function. It can also only be called once.
 
 
 #### Getting a delegate for runtime functionality
@@ -137,9 +154,9 @@ Starts the runtime and returns a function pointer to specified functionality of 
   * `ijw` - IJW entry-point
 * `delegate` - when successful, the native function pointer to the requested runtime functionality.
 
-*TODO: Is it OK to allow calling this even when initialized via `hostfxr_initialize_for_app`? It would mean the app can't be executed via `hostfxr_run_app` anymore.*
+Initially the function will only work if `hostfxr_initialize_for_runtime_config` was used to initialize the host. Later on this could be relaxed to allow the combination with `hostfxr_initialize_for_app`.  
 
-*TODO: Is it OK to call this more than once on an initialized host?*
+Initially there might be a limitation of calling this function only once on a given initialized host to simplify the implementation. Currently we don't have a scenario where it would be absolutely required to support multiple calls.
 
 
 ### Cleanup
@@ -150,13 +167,8 @@ Closes the initialized host.
 * `handle` - handle to the initialized host to close.
 
 
-Notes:
-* `hostfxr_handle` is currently not absolutely necessary mainly because it won't be supported to call initialize multiple times. The limitation comes from usage of static variables in the implementation (and lack of scenarios). In the future this limitation may go away. Once it does the handle will be necessary for property functionality.
-* Similarly the `hostfxr_shutdown` is effectively a no-op for now.
-
-
 ## Samples
-All samples assume that the native host has found the `hostfxr`, loaded it and got the exports. TODO: Reference to `nethost` spec.
+All samples assume that the native host has found the `hostfxr`, loaded it and got the exports. *TODO: Reference to `nethost` spec.*
 Samples in general ignore error handling.
 
 ### Running app with additional runtime properties
