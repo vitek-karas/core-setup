@@ -33,7 +33,7 @@ All the "initialize" functions will
 * Process the `.runtimeconfig.json`
 * Resolve framework references and find actual frameworks
 * Find the root framework (`Microsoft.NETCore.App`) and load the `hostpolicy` from it
-* The `hostpolicy` will then process all relevant `.deps.json` files and produce the list of assemblies, native search paths and other artifacts needed to initialize th
+* The `hostpolicy` will then process all relevant `.deps.json` files and produce the list of assemblies, native search paths and other artifacts needed to initialize the runtime.
 
 The functions will NOT load the CoreCLR runtime. They just prepare everything to the point where it can be loaded.
 
@@ -83,7 +83,7 @@ This function can only be called once per-process. It's not supported to run mul
 
 This function will fail if there already is a CoreCLR running in the process.
 
-*Note: This is effectively a replacement for `hostfxr_main_startupinfo` and `hostfxr_main`. Currently it is not be a goal to fully replace these APIs because they also support SDK commands which are special in lot of ways and don't fit well with the rest of the native hosting. There's no scenario right now which would require the ability to issue SDK commands from a native host. That said nothing in this proposal should block enabling even SDK commands through these APIs.*
+*Note: This is effectively a replacement for `hostfxr_main_startupinfo` and `hostfxr_main`. Currently it is not a goal to fully replace these APIs because they also support SDK commands which are special in lot of ways and don't fit well with the rest of the native hosting. There's no scenario right now which would require the ability to issue SDK commands from a native host. That said nothing in this proposal should block enabling even SDK commands through these APIs.*
 
 
 ``` C
@@ -95,7 +95,7 @@ int hostfxr_initialize_for_runtime_config(
 ```
 
 This function would load the specified `.runtimeconfig.json`, resolve all frameworks, resolve all the assets from those frameworks abd then prepare runtime initialization where the TPA contains only frameworks. Note that this case does NOT consume any `.deps.json` from the app/component (only processes the framework's `.deps.json`). This entry point is intended for `comhost`/`ijwhost`/`nethost` and similar scenarios.
-* `runtime_config_path` - path to the `.runtimeconfig.json` file to process. Unlike with the `hostfxr_initialize_for_app`, there is no `.deps.json` from the app/component which will be processed.
+* `runtime_config_path` - path to the `.runtimeconfig.json` file to process. Unlike with the `hostfxr_initialize_for_app`, any `.deps.json` from the app/component will not be processed by the hosting layers.
 * `parameters` - additional parameters - see `hostfxr_initialize_parameters` for details. (Could be made optional potentially)
 * `host_context_handle` - output parameter. On success receives an opaque value which identifies the initialized host context. The handle should be closed by calling `hostfxr_shutdown`.
 
@@ -106,7 +106,13 @@ This function can be called multiple times in a process.
 It needs to be possible to call this function simultaneously from multiple threads at the same time.
 It also needs to be possible to call this function while there is an active host context created by `hostfxr_initialize_for_app` and running inside the `hostfxr_run_app`.
 
-The function returns specific return code for the first initialized host context, and a different one for any subsequent one. Both return codes are considered "success". It's important to communicate which host context is the "first" as that's the only one which will allow setting runtime properties.
+The function returns specific return code for the first initialized host context, and a different one for any subsequent one. Both return codes are considered "success". If there already was initialized host context in the process then the returned host context has these limitations:
+* It won't allow setting runtime properties.
+* The initialization will compare the runtime properties from the `.runtimeconfig.json` specified in the `runtime_config_path` with those already set to the runtime in the process
+  * If all properties from the new runtime config are already set and have the exact same values (case sensitive string comparison), the initialization succeeds with no additional consequences. (Note that this is the most typical case where the runtime config have no properties in it.)
+  * If there are either new properties which are not set in the runtime or ones which have different values, the initialization will return a special return code - a "warning". It's not a full on failure as initialized context will be returned.
+  * In both cases only the properties specified by the new runtime config will be reported on the host context. This is to allow host to decide in the "warning" case if it's OK to let the component run or not.
+  * In both cases the returned host context can still be used to get a runtime delegate, the properties from the new runtime config will be ignored (as there's no way to modify those in the runtime).
 
 
 ### Inspect and modify host context
@@ -136,11 +142,11 @@ These functions allow the native host to inspect and modify runtime properties. 
 
 Trying to get a property which doesn't exist is an error and `hostfxr_get_runtime_property` will return an appropriate error code.
 
-Setting properties is only supported on the first host context in the process. This is really a limitation of the runtime for which the runtime properties are immutable. Once the first host context is initialized and starts a runtime there's no way to change these properties. For now we will not consider the scenario where the host context is initialize but the runtime hasn't started yet, mainly for simplicity of implementation and lack of requirements.
+Setting properties is only supported on the first host context in the process. This is really a limitation of the runtime for which the runtime properties are immutable. Once the first host context is initialized and starts a runtime there's no way to change these properties. For now we will not consider the scenario where the host context is initialized but the runtime hasn't started yet, mainly for simplicity of implementation and lack of requirements.
 
 We're proposing a fix in `hostpolicy` which will make sure that there are no duplicates possible after initialization (see dotnet/core-setup#5529). With that `hostfxr_get_runtime_property` will work always (as there can only be one value).
 
-*TODO: Can we support getting properties when there is preexisting runtime?*
+*TODO: Should there be a way to get to the properties of the already initialized runtime, so that the native host can compare the new ones to the ones used by the runtime? This could be done by specifying `nullptr` as the `host_context_handle`, which would mean the "one" host context.*
 
 *TODO: Should there be a way to enumerate all the properties?*
 
