@@ -94,7 +94,7 @@ int hostfxr_initialize_for_runtime_config(
 );
 ```
 
-This function would load the specified `.runtimeconfig.json`, resolve all frameworks, resolve all the assets from those frameworks abd then prepare runtime initialization where the TPA contains only frameworks. Note that this case does NOT consume any `.deps.json` from the app/component (only processes the framework's `.deps.json`). This entry point is intended for `comhost`/`ijwhost`/`nethost` and similar scenarios.
+This function would load the specified `.runtimeconfig.json`, resolve all frameworks, resolve all the assets from those frameworks and then prepare runtime initialization where the TPA contains only frameworks. Note that this case does NOT consume any `.deps.json` from the app/component (only processes the framework's `.deps.json`). This entry point is intended for `comhost`/`ijwhost`/`nethost` and similar scenarios.
 * `runtime_config_path` - path to the `.runtimeconfig.json` file to process. Unlike with the `hostfxr_initialize_for_app`, any `.deps.json` from the app/component will not be processed by the hosting layers.
 * `parameters` - additional parameters - see `hostfxr_initialize_parameters` for details. (Could be made optional potentially)
 * `host_context_handle` - output parameter. On success receives an opaque value which identifies the initialized host context. The handle should be closed by calling `hostfxr_shutdown`.
@@ -111,44 +111,87 @@ The function returns specific return code for the first initialized host context
 * The initialization will compare the runtime properties from the `.runtimeconfig.json` specified in the `runtime_config_path` with those already set to the runtime in the process
   * If all properties from the new runtime config are already set and have the exact same values (case sensitive string comparison), the initialization succeeds with no additional consequences. (Note that this is the most typical case where the runtime config have no properties in it.)
   * If there are either new properties which are not set in the runtime or ones which have different values, the initialization will return a special return code - a "warning". It's not a full on failure as initialized context will be returned.
-  * In both cases only the properties specified by the new runtime config will be reported on the host context. This is to allow host to decide in the "warning" case if it's OK to let the component run or not.
+  * In both cases only the properties specified by the new runtime config will be reported on the host context. This is to allow the native host to decide in the "warning" case if it's OK to let the component run or not.
   * In both cases the returned host context can still be used to get a runtime delegate, the properties from the new runtime config will be ignored (as there's no way to modify those in the runtime).
 
 
 ### Inspect and modify host context
 
 #### Runtime properties
+These functions allow the native host to inspect and modify runtime properties.
+* If the `host_context_handle` represents the first initialized context in the process, these functions expose all properties from runtime configurations as well as those computed by the hosting layer components. These functions will allow modification of the properties via `hostfxr_set_runtime_property`. 
+* If the `host_context_handle` represents any other context (so not the first one), these functions expose only properties from runtime configuration. These functions won't allow modification of the properties.
+
+It is possible to access runtime properties of the first initialized context in the process at any time (for reading only), by specifying `nullptr` as the `host_context_handle`.
+
 ``` C
 int hostfxr_get_runtime_property(
     const hostfxr_handle host_context_handle,
     const char_t * name,
-    char_t * value_buffer,
-    size_t value_buffer_size,
-    size_t * value_buffer_used);
+    char_t * buffer,
+    size_t buffer_size,
+    size_t * buffer_used);
+```
 
+Returns the value of a property specified by its name.
+* `host_context_handle` - the initialized host context. If set to `nullptr` the function will operate on runtime properties of the first host context in the process.
+* `name` - the name of the runtime property to get. Must not be `nullptr`.
+* `buffer` - buffer to receive the value of the property
+* `buffer_size` - the size of the `buffer` in `char_t` units.
+* `buffer_used` - when successful contains number of `char_t` units used in the buffer (including the null terminator). If the specified `buffer_size` was too small, the function returns `HostApiBufferTooSmall` and sets the `buffer_used` to the minimum required size.
+
+Trying to get a property which doesn't exist is an error and will return an appropriate error code.
+
+We're proposing a fix in `hostpolicy` which will make sure that there are no duplicates possible after initialization (see dotnet/core-setup#5529). With that `hostfxr_get_runtime_property` will work always (as there can only be one value).
+
+
+``` C
 int hostfxr_set_runtime_property(
     const hostfxr_handle host_context_handle,
     const char_t * name,
     const char_t * value);
 ```
 
-These functions allow the native host to inspect and modify runtime properties. After initialization the properties should contain everything which the hosting components calculate. This gives the native host the opportunity to inspect, modify and resolve any potential conflicts.
+Sets the value of a property.
 * `host_context_handle` - the initialized host context.
-* `name` - the name of the runtime property to get/set. Must not be `nullptr`.
+* `name` - the name of the runtime property to set. Must not be `nullptr`.
 * `value` - the value of the property to set. If the property already has a value in the host context, this function will overwrite it. When set to `nullptr` and if the property already has a value then the property is "unset" - removed from the runtime property collection.
-* `value_buffer` - buffer to receive the value of the property
-* `value_buffer_size` - the size of the `value_buffer` in `char_t` units.
-* `value_buffer_used` - when successful contains number of `char_t` units used in the buffer (including the null terminator). If the specified `value_buffer_size` was too small, the function returns `HostApiBufferTooSmall` and sets the `value_buffer_used` to the minimum required size.
-
-Trying to get a property which doesn't exist is an error and `hostfxr_get_runtime_property` will return an appropriate error code.
 
 Setting properties is only supported on the first host context in the process. This is really a limitation of the runtime for which the runtime properties are immutable. Once the first host context is initialized and starts a runtime there's no way to change these properties. For now we will not consider the scenario where the host context is initialized but the runtime hasn't started yet, mainly for simplicity of implementation and lack of requirements.
 
-We're proposing a fix in `hostpolicy` which will make sure that there are no duplicates possible after initialization (see dotnet/core-setup#5529). With that `hostfxr_get_runtime_property` will work always (as there can only be one value).
 
-*TODO: Should there be a way to get to the properties of the already initialized runtime, so that the native host can compare the new ones to the ones used by the runtime? This could be done by specifying `nullptr` as the `host_context_handle`, which would mean the "one" host context.*
+``` C
+int hostfxr_get_runtime_property_count(
+    const hostfxr_handle host_context_handle,
+    size_t * count);
+```
 
-*TODO: Should there be a way to enumerate all the properties?*
+Gets the number of properties available on the host context. Use this in combination with `hostfxr_get_runtime_property_name` to enumerate all runtime properties on the host context.
+* `host_context_handle` - the initialized host context. If set to `nullptr` the function will operate on runtime properties of the first host context in the process.
+* `count` - out parameter which must not be `nullptr` and which receives the number of runtime properties on the host context.
+
+Note that `hostfxr_set_runtime_property` can remove or add new properties, so the number of properties returned is only valid as long as no properties were added/removed.
+
+
+``` C
+int hostfxr_get_runtime_property_name(
+    const hostfxr_handle host_context_handle,
+    size_t property_index,
+    char_t * buffer,
+    size_t buffer_size,
+    size_t * buffer_used);
+```
+
+Gets the name of a property identified by its index. This can be used to enumerate all runtime properties on the host context.
+* `host_context_handle` - the initialized host context. If set to `nullptr` the function will operate on runtime properties of the first host context in the process.
+* `property_index` - the index of the property to get the name of. This must be greater or equal to `0` and must be smaller than the property count reported by `hostfxr_get_runtime_property_count`.
+* `buffer` - buffer to receive the name of the property
+* `buffer_size` - the size of the `buffer` in `char_t` units.
+* `buffer_used` - when successful contains number of `char_t` units used in the buffer (including the null terminator). If the specified `buffer_size` was too small, the function returns `HostApiBufferTooSmall` and sets the `buffer_used` to the minimum required size.
+
+The order of properties is not defined, but it's stable.
+
+Note that `hostfxr_set_runtime_property` can remove or add new properties, so the property indexes are only stable as long as no properties were added/removed.
 
 
 ### Start the runtime
