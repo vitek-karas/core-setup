@@ -651,6 +651,56 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.FrameworkResolution
                 .ShouldHaveResolvedFramework(MicrosoftNETCoreApp, resolvedFramework);
         }
 
+        // Verify that inner framework reference (<fxRefVersion>, <fxRollForward>)
+        // is correctly reconciled with app's framework reference (<appRefVersion>, <appRollForward>).
+        // In this case the direct reference from app is first, so the framework reference from app
+        // is actually resolved against the disk - and the resolved framework is than compared to
+        // the inner framework reference (potentially causing re-resolution).
+        // This is mostly a collection of interesting cases as testing the full matrix is not possible
+        [Theory] // appRefVersion appRollForward                            fxRefVersion fxRollForward                             resolvedFramework
+        // Defaults - should apply normal Minor semantics
+        [InlineData("5.0.0",      null,                                     "5.0.0",     null,                                     "5.1.3")]
+        // LatestMinor + Major -> for now picks the most restrictive and thus Minor behavior
+        [InlineData("5.0.0",      Constants.RollForwardSetting.LatestMinor, "5.0.0",     Constants.RollForwardSetting.Major,       "5.1.3")]
+        [InlineData("5.0.0",      Constants.RollForwardSetting.Major,       "5.0.0",     Constants.RollForwardSetting.LatestMinor, "5.1.3")]
+        // LatestMinor + LatestMajor -> LatestMinor
+        [InlineData("5.0.0",      Constants.RollForwardSetting.LatestMinor, "5.0.0",     Constants.RollForwardSetting.LatestMajor, "5.6.0")]
+        [InlineData("5.0.0",      Constants.RollForwardSetting.LatestMajor, "5.0.0",     Constants.RollForwardSetting.LatestMinor, "5.6.0")]
+        // LatestMajor + Major -> Major
+        [InlineData("4.0.0",      Constants.RollForwardSetting.LatestMajor, "4.0.0",     Constants.RollForwardSetting.Major,       "5.1.3")]
+        [InlineData("4.0.0",      Constants.RollForwardSetting.Major,       "5.0.0",     Constants.RollForwardSetting.LatestMajor, "5.1.3")]
+        // LatestMinor + LatestPatch -> LatestPatch
+        [InlineData("5.1.0",      Constants.RollForwardSetting.LatestMinor, "5.1.0",     Constants.RollForwardSetting.LatestPatch, "5.1.3")]
+        [InlineData("5.0.0",      Constants.RollForwardSetting.LatestMinor, "5.0.0",     Constants.RollForwardSetting.LatestPatch, null)]
+        [InlineData("5.1.0",      Constants.RollForwardSetting.LatestPatch, "5.1.0",     Constants.RollForwardSetting.LatestPatch, "5.1.3")]
+        [InlineData("5.0.0",      Constants.RollForwardSetting.LatestPatch, "5.0.0",     Constants.RollForwardSetting.LatestPatch, null)]
+        public void ReconcileFrameworkReferences_Combinations(
+            string appVersionReference,
+            string appRollForward,
+            string fxVersionReference,
+            string fxRollForward,
+            string resolvedFramework)
+        {
+            CommandResult result = RunTest(
+                runtimeConfig => runtimeConfig
+                    .WithFramework(new RuntimeConfig.Framework(MicrosoftNETCoreApp, appVersionReference)
+                        .WithRollForward(appRollForward))
+                    .WithFramework(MiddleWare, "2.1.0"),
+                dotnetCustomizer => dotnetCustomizer.Framework(MiddleWare).RuntimeConfig(runtimeConfig =>
+                    runtimeConfig.GetFramework(MicrosoftNETCoreApp)
+                        .WithRollForward(fxRollForward)
+                        .Version = fxVersionReference));
+
+            if (resolvedFramework == null)
+            {
+                result.Should().Fail();
+            }
+            else
+            {
+                result.Should().Pass().And.HaveResolvedFramework(MicrosoftNETCoreApp, resolvedFramework);
+            }
+        }
+
         private CommandResult RunTest(
             Func<RuntimeConfig, RuntimeConfig> runtimeConfig,
             Action<DotNetCliExtensions.DotNetCliCustomizer> customizeDotNet = null,
