@@ -216,7 +216,63 @@ bool pal::get_global_dotnet_dirs(std::vector<pal::string_t>* recv)
 
 bool pal::get_dotnet_self_registered_dir(pal::string_t* recv)
 {
-    return false;
+    recv->clear();
+
+    //  ***Used only for testing***
+    pal::string_t environment_override;
+    if (getenv_test_only(_X("_DOTNET_TEST_GLOBALLY_REGISTERED_PATH"), &environment_override))
+    {
+        recv->assign(environment_override);
+        return true;
+    }
+    //  ***************************
+
+    pal::string_t install_location_file_path = _X("/etc/dotnet/install_location");
+
+    //  ***Used only for testing***
+    pal::string_t environment_install_location_override;
+    if (getenv_test_only(_X("_DOTNET_TEST_INSTALL_LOCATION_FILE_PATH"), &environment_install_location_override))
+    {
+        install_location_file_path = environment_install_location_override;
+    }
+    //  ***************************
+
+    trace::verbose(_X("Looking for install_location file in '%s'."), install_location_file_path.c_str());
+    FILE * install_location_file = pal::file_open(install_location_file_path, "r");
+    if (install_location_file == nullptr)
+    {
+        trace::verbose(_X("The install_location file failed to open."));
+        return false;
+    }
+
+    bool result = false;
+
+    char buf[PATH_MAX];
+    char* install_location = fgets(buf, sizeof(buf), install_location_file);
+    if (install_location != nullptr)
+    {
+        size_t len = pal::strlen(install_location);
+
+        // fgets includes the newline character in the string - so remove it.
+        if (len > 0 && len < PATH_MAX && install_location[len - 1] == '\n')
+        {
+            install_location[len - 1] = '\0';
+        }
+
+        trace::verbose(_X("Considering install location '%s'"), install_location);
+        *recv = install_location;
+        if (pal::realpath(path))
+        {
+            result = true;
+        }
+    }
+    else
+    {
+        trace::verbose(_X("The install_location file first line could not be read."));
+    }
+    
+    fclose(install_location_file);
+    return result;
 }
 
 bool pal::get_default_installation_dir(pal::string_t* recv)

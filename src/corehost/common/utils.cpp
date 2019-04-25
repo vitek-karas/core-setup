@@ -471,5 +471,11 @@ bool getenv_test_only(const pal::char_t* name, pal::string_t* recv)
         return false;
     }
 
-    return pal::getenv(name, recv);
+    if (pal::getenv(name, recv))
+    {
+        trace::verbose(_X("Test only env. variable used: '%s=%s'"), name, recv->c_str());
+        return true;
+    }
+
+    return false;
 }
