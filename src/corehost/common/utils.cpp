@@ -451,3 +451,25 @@ void get_runtime_config_paths(const pal::string_t& path, const pal::string_t& na
 
     trace::verbose(_X("Runtime config is cfg=%s dev=%s"), json_path.c_str(), dev_json_path.c_str());
 }
+
+// Retrieves environment variable which is only used for testing.
+// This will only work if there's also a _dotnet_test_only_enabled file next to the current module
+// (which means next to dotnet.exe, apphost.exe, hostfxr.dll and so on, whichever is being tested)
+bool getenv_test_only(const pal::char_t* name, pal::string_t* recv)
+{
+    pal::string_t own_module_path;
+    if (!pal::get_own_module_path(&own_module_path))
+    {
+        return false;
+    }
+
+    pal::string_t test_only_file_path = get_directory(own_module_path);
+    append_path(&test_only_file_path, _X("_dotnet_test_only_enabled"));
+
+    if (!pal::file_exists(test_only_file_path))
+    {
+        return false;
+    }
+
+    return pal::getenv(name, recv);
+}

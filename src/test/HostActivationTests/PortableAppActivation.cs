@@ -335,6 +335,7 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
             // Get the framework location that was built
             string builtDotnet = fixture.BuiltDotnet.BinPath;
 
+            using (TestOnlyProductBehavior.Enable(appExe))
             using (var regKeyOverride = new RegisteredInstallKeyOverride())
             {
                 string architecture = fixture.CurrentRid.Split('-')[1];

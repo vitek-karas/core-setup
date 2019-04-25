@@ -66,6 +66,11 @@ pal::string_t get_dotnet_root_env_var_name();
 pal::string_t get_deps_from_app_binary(const pal::string_t& app_base, const pal::string_t& app);
 void get_runtime_config_paths(const pal::string_t& path, const pal::string_t& name, pal::string_t* cfg, pal::string_t* dev_cfg);
 
+// Retrieves environment variable which is only used for testing.
+// This will only work if there's also a _dotnet_test_only_enabled file next to the current module
+// (which means next to dotnet.exe, apphost.exe, hostfxr.dll and so on, whichever is being tested)
+bool getenv_test_only(const pal::char_t* name, pal::string_t* recv);
+
 // Helper class to make it easy to propagate error writer to the hostpolicy
 class propagate_error_writer_t
 {

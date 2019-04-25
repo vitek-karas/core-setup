@@ -207,6 +207,15 @@ bool pal::get_default_servicing_directory(string_t* recv)
 
 bool pal::get_default_installation_dir(pal::string_t* recv)
 {
+    //  ***Used only for testing***
+    pal::string_t environmentOverride;
+    if (getenv_test_only(_X("_DOTNET_TEST_DEFAULT_INSTALL_PATH"), &environmentOverride))
+    {
+        recv->assign(environmentOverride);
+        return true;
+    }
+    //  ***************************
+
     pal::char_t* program_files_dir;
     if (pal::is_running_in_wow64())
     {
@@ -237,7 +246,7 @@ bool pal::get_dotnet_self_registered_dir(pal::string_t* recv)
 
     //  ***Used only for testing***
     pal::string_t environmentOverride;
-    if (pal::getenv(_X("_DOTNET_TEST_GLOBALLY_REGISTERED_PATH"), &environmentOverride))
+    if (getenv_test_only(_X("_DOTNET_TEST_GLOBALLY_REGISTERED_PATH"), &environmentOverride))
     {
         recv->assign(environmentOverride);
         return true;
@@ -250,7 +259,7 @@ bool pal::get_dotnet_self_registered_dir(pal::string_t* recv)
     pal::string_t dotnet_key_path = pal::string_t(_X("SOFTWARE\\dotnet"));
 
     pal::string_t environmentRegistryPathOverride;
-    if (pal::getenv(_X("_DOTNET_TEST_REGISTRY_PATH"), &environmentRegistryPathOverride))
+    if (getenv_test_only(_X("_DOTNET_TEST_REGISTRY_PATH"), &environmentRegistryPathOverride))
     {
         pal::string_t hkcuPrefix = _X("HKEY_CURRENT_USER\\");
         if (environmentRegistryPathOverride.substr(0, hkcuPrefix.length()) == hkcuPrefix)

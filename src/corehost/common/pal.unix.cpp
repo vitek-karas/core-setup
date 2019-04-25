@@ -216,12 +216,20 @@ bool pal::get_global_dotnet_dirs(std::vector<pal::string_t>* recv)
 
 bool pal::get_dotnet_self_registered_dir(pal::string_t* recv)
 {
-    // No support for global directories in Unix.
     return false;
 }
 
 bool pal::get_default_installation_dir(pal::string_t* recv)
 {
+    //  ***Used only for testing***
+    pal::string_t environmentOverride;
+    if (getenv_test_only(_X("_DOTNET_TEST_DEFAULT_INSTALL_PATH"), &environmentOverride))
+    {
+        recv->assign(environmentOverride);
+        return true;
+    }
+    //  ***************************
+
 #if defined(__APPLE__)
      recv->assign(_X("/usr/local/share/dotnet"));
 #else

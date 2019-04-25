@@ -65,33 +65,46 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
         [InlineData(true, false, true)]
         public void GetHostFxrPath_GlobalInstallation(bool useAssemblyPath, bool useRegisteredLocation, bool isValid)
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                // We don't have a good way of hooking into how the product looks for global installations yet.
-                return;
-            }
+            //if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            //{
+            //    // We don't have a good way of hooking into how the product looks for global installations yet.
+            //    return;
+            //}
 
             // Overide the registry key for self-registered global installs.
             // If using the registered location, set the install location value to the valid/invalid root.
             // If not using the registered location, do not set the value. When the value does not exist,
             // the product falls back to the default install location.
             CommandResult result;
-            string installRoot = Path.Combine(isValid ? sharedState.ValidInstallRoot : sharedState.InvalidInstallRoot);
-            using (var regKeyOverride = new RegisteredInstallKeyOverride())
+            string installLocation = Path.Combine(isValid ? sharedState.ValidInstallRoot : sharedState.InvalidInstallRoot, "dotnet");
+            RegisteredInstallKeyOverride regKeyOverride = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? new RegisteredInstallKeyOverride()
+                : null;
+            using (regKeyOverride)
+            using (TestOnlyProductBehavior.Enable(sharedState.NethostPath))
             {
                 if (useRegisteredLocation)
                 {
-                    regKeyOverride.SetInstallLocation(Path.Combine(installRoot, "dotnet"), sharedState.RepoDirectories.BuildArchitecture);
+                    regKeyOverride.SetInstallLocation(installLocation, sharedState.RepoDirectories.BuildArchitecture);
                 }
 
-                string programFilesOverride = useRegisteredLocation ? sharedState.InvalidInstallRoot : installRoot;
-                result = Command.Create(sharedState.NativeHostPath, $"{GetHostFxrPath} {(useAssemblyPath ? sharedState.TestAssemblyPath : string.Empty)}")
+                Command command = Command.Create(sharedState.NativeHostPath, $"{GetHostFxrPath} {(useAssemblyPath ? sharedState.TestAssemblyPath : string.Empty)}")
                     .CaptureStdErr()
                     .CaptureStdOut()
-                    .EnvironmentVariable("COREHOST_TRACE", "1")
-                    .EnvironmentVariable(Constants.TestOnlyEnvironmentVariables.RegistryPath, regKeyOverride.KeyPath)
-                    .EnvironmentVariable("TEST_OVERRIDE_PROGRAMFILES", programFilesOverride)
-                    .Execute();
+                    .EnvironmentVariable("COREHOST_TRACE", "1");
+
+                // On Windows redirect the registry path to our own key which we can write to.
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    command = command.EnvironmentVariable(Constants.TestOnlyEnvironmentVariables.RegistryPath, regKeyOverride.KeyPath);
+                }
+
+                // Redirect the default install location to a test directory (since the true default install location needs a 
+                command = command.EnvironmentVariable(
+                    Constants.TestOnlyEnvironmentVariables.DefaultInstallPath,
+                    useRegisteredLocation ? sharedState.InvalidInstallRoot : installLocation);
+
+                result = command.Execute();
             }
 
             result.Should().HaveStdErrContaining("Using global installation location");
@@ -131,6 +144,8 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
 
         public class SharedTestState : SharedTestStateBase
         {
+            public string NethostPath { get; }
+
             public string HostFxrPath { get; }
             public string InvalidInstallRoot { get; }
             public string ValidInstallRoot { get; }
@@ -141,9 +156,10 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
             {
                 // Copy nethost next to native host
                 string nethostName = RuntimeInformationExtensions.GetSharedLibraryFileNameForCurrentPlatform("nethost");
+                NethostPath = Path.Combine(Path.GetDirectoryName(NativeHostPath), nethostName);
                 File.Copy(
                     Path.Combine(RepoDirectories.CorehostPackages, nethostName),
-                    Path.Combine(Path.GetDirectoryName(NativeHostPath), nethostName));
+                    NethostPath);
 
                 InvalidInstallRoot = Path.Combine(BaseDirectory, "invalid");
                 Directory.CreateDirectory(InvalidInstallRoot);
