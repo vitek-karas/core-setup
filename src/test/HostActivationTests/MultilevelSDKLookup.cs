@@ -517,9 +517,9 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
             }
 
             using (TestOnlyProductBehavior.Enable(DotNet.GreatestVersionHostFxrPath))
-            using (var regKeyOverride = new RegisteredInstallKeyOverride())
+            using (var registeredInstallLocationOverride = new RegisteredInstallLocationOverride())
             {
-                regKeyOverride.SetInstallLocation(_regDir, RepoDirectories.BuildArchitecture);
+                registeredInstallLocationOverride.SetInstallLocation(_regDir, RepoDirectories.BuildArchitecture);
 
                 // Add SDK versions
                 AddAvailableSdkVersions(_regSdkBaseDir, "9999.0.4");
@@ -535,7 +535,7 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
                     .WithUserProfile(_userDir)
                     .Environment(s_DefaultEnvironment)
                     .EnvironmentVariable("DOTNET_MULTILEVEL_LOOKUP", "1")
-                    .EnvironmentVariable(Constants.TestOnlyEnvironmentVariables.RegistryPath, regKeyOverride.KeyPath)
+                    .ApplyRegisteredInstallLocationOverride(registeredInstallLocationOverride)
                     .CaptureStdOut()
                     .CaptureStdErr()
                     .Execute()

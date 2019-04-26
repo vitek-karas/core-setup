@@ -336,16 +336,16 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
             string builtDotnet = fixture.BuiltDotnet.BinPath;
 
             using (TestOnlyProductBehavior.Enable(appExe))
-            using (var regKeyOverride = new RegisteredInstallKeyOverride())
+            using (var registeredInstallLocationOverride = new RegisteredInstallLocationOverride())
             {
                 string architecture = fixture.CurrentRid.Split('-')[1];
-                regKeyOverride.SetInstallLocation(builtDotnet, architecture);
+                registeredInstallLocationOverride.SetInstallLocation(builtDotnet, architecture);
 
                 // Verify running with the default working directory
                 Command.Create(appExe)
                     .CaptureStdErr()
                     .CaptureStdOut()
-                    .EnvironmentVariable(Constants.TestOnlyEnvironmentVariables.RegistryPath, regKeyOverride.KeyPath)
+                    .ApplyRegisteredInstallLocationOverride(registeredInstallLocationOverride)
                     .Execute()
                     .Should().Pass()
                     .And.HaveStdOutContaining("Hello World")
@@ -354,7 +354,7 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
                 // Verify running from within the working directory
                 Command.Create(appExe)
                     .WorkingDirectory(fixture.TestProject.OutputDirectory)
-                    .EnvironmentVariable(Constants.TestOnlyEnvironmentVariables.RegistryPath, regKeyOverride.KeyPath)
+                    .ApplyRegisteredInstallLocationOverride(registeredInstallLocationOverride)
                     .CaptureStdErr()
                     .CaptureStdOut()
                     .Execute()

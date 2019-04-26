@@ -65,46 +65,29 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
         [InlineData(true, false, true)]
         public void GetHostFxrPath_GlobalInstallation(bool useAssemblyPath, bool useRegisteredLocation, bool isValid)
         {
-            //if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            //{
-            //    // We don't have a good way of hooking into how the product looks for global installations yet.
-            //    return;
-            //}
-
             // Overide the registry key for self-registered global installs.
             // If using the registered location, set the install location value to the valid/invalid root.
             // If not using the registered location, do not set the value. When the value does not exist,
             // the product falls back to the default install location.
             CommandResult result;
             string installLocation = Path.Combine(isValid ? sharedState.ValidInstallRoot : sharedState.InvalidInstallRoot, "dotnet");
-            RegisteredInstallKeyOverride regKeyOverride = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? new RegisteredInstallKeyOverride()
-                : null;
-            using (regKeyOverride)
+            using (RegisteredInstallLocationOverride registeredInstallLocationOverride = new RegisteredInstallLocationOverride())
             using (TestOnlyProductBehavior.Enable(sharedState.NethostPath))
             {
                 if (useRegisteredLocation)
                 {
-                    regKeyOverride?.SetInstallLocation(installLocation, sharedState.RepoDirectories.BuildArchitecture);
+                    registeredInstallLocationOverride.SetInstallLocation(installLocation, sharedState.RepoDirectories.BuildArchitecture);
                 }
 
-                Command command = Command.Create(sharedState.NativeHostPath, $"{GetHostFxrPath} {(useAssemblyPath ? sharedState.TestAssemblyPath : string.Empty)}")
+                result = Command.Create(sharedState.NativeHostPath, $"{GetHostFxrPath} {(useAssemblyPath ? sharedState.TestAssemblyPath : string.Empty)}")
                     .CaptureStdErr()
                     .CaptureStdOut()
-                    .EnvironmentVariable("COREHOST_TRACE", "1");
-
-                // On Windows redirect the registry path to our own key which we can write to.
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    command = command.EnvironmentVariable(Constants.TestOnlyEnvironmentVariables.RegistryPath, regKeyOverride.KeyPath);
-                }
-
-                // Redirect the default install location to a test directory (since the true default install location needs a 
-                command = command.EnvironmentVariable(
-                    Constants.TestOnlyEnvironmentVariables.DefaultInstallPath,
-                    useRegisteredLocation ? sharedState.InvalidInstallRoot : installLocation);
-
-                result = command.Execute();
+                    .EnvironmentVariable("COREHOST_TRACE", "1")
+                    .ApplyRegisteredInstallLocationOverride(registeredInstallLocationOverride)
+                    .EnvironmentVariable( // Redirect the default install location to a test directory (since the true default install location needs a 
+                        Constants.TestOnlyEnvironmentVariables.DefaultInstallPath,
+                        useRegisteredLocation ? sharedState.InvalidInstallRoot : installLocation)
+                    .Execute();
             }
 
             result.Should().HaveStdErrContaining("Using global installation location");
