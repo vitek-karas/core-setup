@@ -4,7 +4,6 @@
 
 using Microsoft.DotNet.Cli.Build.Framework;
 using System.IO;
-using System.Runtime.InteropServices;
 using Xunit;
 
 namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting

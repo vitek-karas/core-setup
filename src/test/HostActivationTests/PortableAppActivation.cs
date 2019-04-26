@@ -7,17 +7,15 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Runtime.InteropServices;
-using Microsoft.Win32;
 using Xunit;
 
 namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
 {
     public class PortableAppActivation : IClassFixture<PortableAppActivation.SharedTestState>
     {
-        private SharedTestState sharedTestState;
+        private readonly SharedTestState sharedTestState;
 
-        public PortableAppActivation(PortableAppActivation.SharedTestState fixture)
+        public PortableAppActivation(SharedTestState fixture)
         {
             sharedTestState = fixture;
         }
@@ -74,7 +72,7 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
                 .Copy();
 
             var dotnet = fixture.BuiltDotnet;
-            var appDll = fixture.TestProject.AppDll.Replace(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);
+            var appDll = fixture.TestProject.AppDll.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
             dotnet.Exec(appDll)
                 .CaptureStdErr()
@@ -93,11 +91,11 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
 
             var dotnet = fixture.BuiltDotnet;
             var appDll = fixture.TestProject.AppDll;
-            
+
             dotnet.Exec("exec", "--runtimeconfig", runtimeConfig, appDll)
                 .CaptureStdErr()
                 .CaptureStdOut()
-                .Execute(fExpectedToFail:true)
+                .Execute(fExpectedToFail: true)
                 .Should().Fail();
         }
 
@@ -174,7 +172,7 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
                 .Execute()
                 .Should().Pass()
                 .And.HaveStdOutContaining("Hello World");
-            
+
         }
 
         [Fact]
@@ -235,7 +233,7 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
             dotnet.Exec("exec", "--depsfile", depsJson, appDll)
                 .CaptureStdErr()
                 .CaptureStdOut()
-                .Execute(fExpectedToFail:true)
+                .Execute(fExpectedToFail: true)
                 .Should().Fail();
         }
 
@@ -431,8 +429,8 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
                 Directory.CreateDirectory(storeoutputDirectory);
             }
 
-            testProjectFixture.StoreProject(outputDirectory :storeoutputDirectory);
-            
+            testProjectFixture.StoreProject(outputDirectory: storeoutputDirectory);
+
             return storeoutputDirectory;
         }
 
