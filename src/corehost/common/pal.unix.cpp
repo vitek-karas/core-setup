@@ -261,7 +261,7 @@ bool pal::get_dotnet_self_registered_dir(pal::string_t* recv)
 
         trace::verbose(_X("Considering install location '%s'"), install_location);
         *recv = install_location;
-        if (pal::realpath(path))
+        if (pal::realpath(recv))
         {
             result = true;
         }
@@ -593,7 +593,16 @@ bool pal::get_own_executable_path(pal::string_t* recv)
 
 bool pal::get_own_module_path(string_t* recv)
 {
-    return false;
+    recv->clear();
+
+    Dl_info info;
+    if (dladdr(reinterpret_cast<void *>(&get_own_module_path), &info) == 0)
+    {
+        return false;
+    }
+
+    recv->assign(info.dli_fname);
+    return true;
 }
 
 bool pal::get_module_path(dll_t module, string_t* recv)

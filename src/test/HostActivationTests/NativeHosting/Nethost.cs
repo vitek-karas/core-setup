@@ -85,7 +85,7 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
             {
                 if (useRegisteredLocation)
                 {
-                    regKeyOverride.SetInstallLocation(installLocation, sharedState.RepoDirectories.BuildArchitecture);
+                    regKeyOverride?.SetInstallLocation(installLocation, sharedState.RepoDirectories.BuildArchitecture);
                 }
 
                 Command command = Command.Create(sharedState.NativeHostPath, $"{GetHostFxrPath} {(useAssemblyPath ? sharedState.TestAssemblyPath : string.Empty)}")

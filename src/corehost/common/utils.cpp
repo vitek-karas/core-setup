@@ -460,6 +460,7 @@ bool getenv_test_only(const pal::char_t* name, pal::string_t* recv)
     pal::string_t own_module_path;
     if (!pal::get_own_module_path(&own_module_path))
     {
+        trace::verbose(_X("Could not find own module path"));
         return false;
     }
 
