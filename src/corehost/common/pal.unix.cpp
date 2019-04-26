@@ -259,12 +259,9 @@ bool pal::get_dotnet_self_registered_dir(pal::string_t* recv)
             install_location[len - 1] = '\0';
         }
 
-        trace::verbose(_X("Considering install location '%s'"), install_location);
+        trace::verbose(_X("Using install location '%s'."), install_location);
         *recv = install_location;
-        if (pal::realpath(recv))
-        {
-            result = true;
-        }
+        result = true;
     }
     else
     {

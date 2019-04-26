@@ -4,6 +4,7 @@
 
 using Microsoft.DotNet.Cli.Build.Framework;
 using System.IO;
+using System.Runtime.InteropServices;
 using Xunit;
 
 namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
@@ -122,6 +123,58 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation.NativeHosting
                 .Execute()
                 .Should().Pass()
                 .And.HaveStdOutContaining($"hostfxr_path: {hostFxrPath}".ToLower());
+        }
+
+        [Theory]
+        [InlineData("{0}", true)]
+        [InlineData("{0}\n", true)]
+        [InlineData("{0}\nSome other text", true)]
+        [InlineData("", false)]
+        [InlineData("\n{0}", false)]
+        [InlineData(" {0}", false)]
+        [InlineData("{0} \n", false)]
+        [InlineData("{0} ", false)]
+        public void GetHostFxrPath_InstallLocationFile(string value, bool shouldPass)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // This test targets the install_location config file which is only used on Linux and macOS.
+                return;
+            }
+
+            string installLocation = Path.Combine(sharedState.ValidInstallRoot, "dotnet");
+
+            using (RegisteredInstallLocationOverride registeredInstallLocationOverride = new RegisteredInstallLocationOverride())
+            using (TestOnlyProductBehavior.Enable(sharedState.NethostPath))
+            {
+                File.WriteAllText(registeredInstallLocationOverride.PathValueOverride, string.Format(value, installLocation));
+
+                CommandResult result = Command.Create(sharedState.NativeHostPath, GetHostFxrPath)
+                    .CaptureStdErr()
+                    .CaptureStdOut()
+                    .EnvironmentVariable("COREHOST_TRACE", "1")
+                    .ApplyRegisteredInstallLocationOverride(registeredInstallLocationOverride)
+                    .EnvironmentVariable( // Redirect the default install location to a an invalid location so that it doesn't cause the test to pass 
+                        Constants.TestOnlyEnvironmentVariables.DefaultInstallPath,
+                        sharedState.InvalidInstallRoot)
+                    .Execute();
+
+                result.Should().HaveStdErrContaining($"Looking for install_location file in '{registeredInstallLocationOverride.PathValueOverride}'.");
+
+                if (shouldPass)
+                {
+                    result.Should().Pass()
+                        .And.HaveStdErrContaining($"Using install location '{installLocation}'.")
+                        .And.HaveStdOutContaining($"hostfxr_path: {sharedState.HostFxrPath}".ToLower());
+                }
+                else
+                {
+                    result.Should().Fail()
+                        .And.ExitWith(1)
+                        .And.HaveStdOutContaining($"{GetHostFxrPath} failed: 0x{CoreHostLibMissingFailure.ToString("x")}")
+                        .And.HaveStdErrContaining($"The required library {HostFxrName} could not be found");
+                }
+            }
         }
 
         public class SharedTestState : SharedTestStateBase
