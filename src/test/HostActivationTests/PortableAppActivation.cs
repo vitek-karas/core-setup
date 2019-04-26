@@ -297,14 +297,11 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
                 .And.HaveStdOutContaining($"Framework Version:{sharedTestState.RepoDirectories.MicrosoftNETCoreAppVersion}");
         }
 
-        [Fact]
-        public void Framework_Dependent_AppHost_From_Global_Registry_Location_Succeeds()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void Framework_Dependent_AppHost_From_Global_Location_Succeeds(bool useRegisteredLocation)
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                return;
-            }
-
             var fixture = sharedTestState.PortableAppFixture_Published
                 .Copy();
 
@@ -339,13 +336,17 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
             using (var registeredInstallLocationOverride = new RegisteredInstallLocationOverride())
             {
                 string architecture = fixture.CurrentRid.Split('-')[1];
-                registeredInstallLocationOverride.SetInstallLocation(builtDotnet, architecture);
+                if (useRegisteredLocation)
+                {
+                    registeredInstallLocationOverride.SetInstallLocation(builtDotnet, architecture);
+                }
 
                 // Verify running with the default working directory
                 Command.Create(appExe)
                     .CaptureStdErr()
                     .CaptureStdOut()
                     .ApplyRegisteredInstallLocationOverride(registeredInstallLocationOverride)
+                    .EnvironmentVariable(Constants.TestOnlyEnvironmentVariables.DefaultInstallPath, useRegisteredLocation ? null : builtDotnet)
                     .Execute()
                     .Should().Pass()
                     .And.HaveStdOutContaining("Hello World")
@@ -353,10 +354,11 @@ namespace Microsoft.DotNet.CoreSetup.Test.HostActivation
 
                 // Verify running from within the working directory
                 Command.Create(appExe)
-                    .WorkingDirectory(fixture.TestProject.OutputDirectory)
-                    .ApplyRegisteredInstallLocationOverride(registeredInstallLocationOverride)
                     .CaptureStdErr()
                     .CaptureStdOut()
+                    .WorkingDirectory(fixture.TestProject.OutputDirectory)
+                    .ApplyRegisteredInstallLocationOverride(registeredInstallLocationOverride)
+                    .EnvironmentVariable(Constants.TestOnlyEnvironmentVariables.DefaultInstallPath, useRegisteredLocation ? null : builtDotnet)
                     .Execute()
                     .Should().Pass()
                     .And.HaveStdOutContaining("Hello World")
