@@ -10,6 +10,10 @@
 #include "trace.h"
 #include "utils.h"
 
+#include <chrono>
+
+std::chrono::time_point<std::chrono::steady_clock> g_clock_start;
+
 #if defined(FEATURE_APPHOST)
 #include "cli/apphost/bundle/bundle_runner.h"
 #include "cli/apphost/bundle/marker.h"
@@ -213,6 +217,7 @@ int exe_start(const int argc, const pal::char_t* argv[])
         {
             propagate_error_writer_t propagate_error_writer_to_hostfxr(set_error_writer_fn);
 
+            std::cout << "corehost: \t" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - g_clock_start).count() << std::endl;
             rc = main_fn_v2(argc, argv, host_path_cstr, dotnet_root_cstr, app_path_cstr);
         }
     }
@@ -269,6 +274,8 @@ int main(const int argc, const pal::char_t* argv[])
 #endif
 {
     trace::setup();
+
+    g_clock_start = std::chrono::high_resolution_clock::now();
 
     if (trace::is_enabled())
     {

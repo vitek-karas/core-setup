@@ -29,6 +29,10 @@
 #include "sdk_resolver.h"
 #include "roll_fwd_on_no_candidate_fx_option.h"
 
+#include <chrono>
+extern std::chrono::time_point<std::chrono::steady_clock> g_clock_start;
+
+
 namespace
 {
     // hostfxr tracks the context used to load hostpolicy and coreclr as the active host context. This is the first
@@ -143,6 +147,7 @@ static int execute_app(
         const host_interface_t& intf = init->get_host_init_data();
         if ((code = hostpolicy_contract.load(&intf)) == StatusCode::Success)
         {
+            std::cout << "hostfxr: \t" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - g_clock_start).count() << std::endl;
             code = host_main(argc, argv);
             (void)hostpolicy_contract.unload();
         }

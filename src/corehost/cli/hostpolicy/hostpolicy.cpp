@@ -20,6 +20,10 @@
 #include <hostpolicy.h>
 #include "hostpolicy_context.h"
 
+#include <chrono>
+
+std::chrono::time_point<std::chrono::steady_clock> g_clock_start;
+
 namespace
 {
     // Initialization information set through corehost_load. All other entry points assume this has already
@@ -235,6 +239,8 @@ int run_app_for_context(
     // Previous hostpolicy trace messages must be printed before executing assembly
     trace::flush();
 
+    std::cout << "hostpolicy: \t" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - g_clock_start).count() << std::endl;
+
     // Execute the application
     unsigned int exit_code;
     auto hr = context.coreclr->execute_assembly(
@@ -372,6 +378,8 @@ int corehost_main_init(
 
 SHARED_API int HOSTPOLICY_CALLTYPE corehost_main(const int argc, const pal::char_t* argv[])
 {
+    g_clock_start = std::chrono::high_resolution_clock::now();
+
     arguments_t args;
     int rc = corehost_main_init(g_init, argc, argv, _X("corehost_main"), args);
     if (rc != StatusCode::Success)
