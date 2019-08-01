@@ -30,7 +30,7 @@
 #include "roll_fwd_on_no_candidate_fx_option.h"
 
 #include <chrono>
-extern std::chrono::time_point<std::chrono::steady_clock> g_clock_start;
+extern std::chrono::time_point<std::chrono::high_resolution_clock> g_clock_start;
 
 
 namespace

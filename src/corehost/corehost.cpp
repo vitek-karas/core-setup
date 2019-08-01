@@ -12,7 +12,7 @@
 
 #include <chrono>
 
-std::chrono::time_point<std::chrono::steady_clock> g_clock_start;
+std::chrono::time_point<std::chrono::high_resolution_clock> g_clock_start;
 
 #if defined(FEATURE_APPHOST)
 #include "cli/apphost/bundle/bundle_runner.h"
