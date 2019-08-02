@@ -20,10 +20,6 @@
 #include <hostpolicy.h>
 #include "hostpolicy_context.h"
 
-#include <chrono>
-
-std::chrono::time_point<std::chrono::high_resolution_clock> g_clock_start;
-
 namespace
 {
     // Initialization information set through corehost_load. All other entry points assume this has already
@@ -76,6 +72,7 @@ namespace
 
             // Create a CoreCLR instance
             trace::verbose(_X("CoreCLR path = '%s', CoreCLR dir = '%s'"), g_context->clr_path.c_str(), g_context->clr_dir.c_str());
+            trace::timestamp(_X("hostpolicy load-coreclr"));
             auto hr = coreclr_t::create(
                 g_context->clr_dir,
                 host_path.data(),
@@ -239,7 +236,7 @@ int run_app_for_context(
     // Previous hostpolicy trace messages must be printed before executing assembly
     trace::flush();
 
-    std::cout << "hostpolicy: \t" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - g_clock_start).count() << std::endl;
+    trace::timestamp(_X("hostpolicy call-coreclr-execute_assembly"));
 
     // Execute the application
     unsigned int exit_code;
@@ -378,7 +375,7 @@ int corehost_main_init(
 
 SHARED_API int HOSTPOLICY_CALLTYPE corehost_main(const int argc, const pal::char_t* argv[])
 {
-    g_clock_start = std::chrono::high_resolution_clock::now();
+    trace::timestamp(_X("hostpolicy corehost_main"));
 
     arguments_t args;
     int rc = corehost_main_init(g_init, argc, argv, _X("corehost_main"), args);

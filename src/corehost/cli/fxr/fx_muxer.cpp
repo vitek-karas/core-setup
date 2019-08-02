@@ -29,10 +29,6 @@
 #include "sdk_resolver.h"
 #include "roll_fwd_on_no_candidate_fx_option.h"
 
-#include <chrono>
-extern std::chrono::time_point<std::chrono::high_resolution_clock> g_clock_start;
-
-
 namespace
 {
     // hostfxr tracks the context used to load hostpolicy and coreclr as the active host context. This is the first
@@ -118,6 +114,8 @@ static int execute_app(
     hostpolicy_contract_t hostpolicy_contract{};
     corehost_main_fn host_main = nullptr;
 
+    trace::timestamp(_X("hostfxr load-hostpolicy"));
+
     int code = load_hostpolicy(impl_dll_dir, &hostpolicy_dll, hostpolicy_contract, "corehost_main", &host_main);
     if (code != StatusCode::Success)
     {
@@ -147,7 +145,8 @@ static int execute_app(
         const host_interface_t& intf = init->get_host_init_data();
         if ((code = hostpolicy_contract.load(&intf)) == StatusCode::Success)
         {
-            std::cout << "hostfxr: \t" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - g_clock_start).count() << std::endl;
+            trace::timestamp(_X("hostfxr call-hostpolicy-host_main"));
+
             code = host_main(argc, argv);
             (void)hostpolicy_contract.unload();
         }
@@ -427,6 +426,8 @@ namespace
         pal::string_t additional_deps_serialized;
         if (is_framework_dependent)
         {
+            trace::timestamp(_X("hostfxr resolving-framework"));
+
             // Apply the --fx-version option to the first framework
             pal::string_t fx_version_specified = command_line::get_option_value(opts, known_options::fx_version, _X(""));
             if (fx_version_specified.length() > 0)

@@ -55,6 +55,8 @@ namespace
 
 bool fxr_resolver::try_get_path(const pal::string_t& root_path, pal::string_t* out_dotnet_root, pal::string_t* out_fxr_path)
 {
+    trace::timestamp(_X("corehost fxr_resolver::try_get_path"));
+
 #if defined(FEATURE_APPHOST) || defined(FEATURE_LIBHOST)
     // For apphost and libhost, root_path is expected to be a directory.
     // For libhost, it may be empty if app-local search is not desired (e.g. com/ijw/winrt hosts, nethost when no assembly path is specified)

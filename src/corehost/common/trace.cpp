@@ -4,6 +4,7 @@
 
 #include "trace.h"
 #include <mutex>
+#include <chrono>
 
 // g_trace_verbosity is used to encode COREHOST_TRACE and COREHOST_TRACE_VERBOSITY to selectively control output of
 //    trace::warn(), trace::info(), and trace::verbose()
@@ -167,6 +168,11 @@ void trace::println(const pal::char_t* format, ...)
 void trace::println()
 {
     println(_X(""));
+}
+
+void trace::timestamp(const pal::char_t* marker)
+{
+    println(_X("%s %llu"), marker, std::chrono::high_resolution_clock::now().time_since_epoch());
 }
 
 void trace::warning(const pal::char_t* format, ...)

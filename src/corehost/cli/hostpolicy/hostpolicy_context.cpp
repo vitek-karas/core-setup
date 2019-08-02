@@ -24,6 +24,8 @@ int hostpolicy_context_t::initialize(hostpolicy_init_t &hostpolicy_init, const a
     host_path = args.host_path;
     breadcrumbs_enabled = enable_breadcrumbs;
 
+    trace::timestamp(_X("hostpolicy initialize-context"));
+
     deps_resolver_t resolver
         {
             args,
@@ -40,6 +42,8 @@ int hostpolicy_context_t::initialize(hostpolicy_init_t &hostpolicy_init, const a
     }
 
     probe_paths_t probe_paths;
+
+    trace::timestamp(_X("hostpolicy resolve-probe-paths"));
 
     // Setup breadcrumbs.
     if (breadcrumbs_enabled)
@@ -63,6 +67,8 @@ int hostpolicy_context_t::initialize(hostpolicy_init_t &hostpolicy_init, const a
             return StatusCode::ResolverResolveFailure;
         }
     }
+
+    trace::timestamp(_X("hostpolicy prepare-coreclr-params"));
 
     clr_path = probe_paths.coreclr;
     if (clr_path.empty() || !pal::realpath(&clr_path))

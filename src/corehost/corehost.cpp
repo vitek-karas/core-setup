@@ -10,10 +10,6 @@
 #include "trace.h"
 #include "utils.h"
 
-#include <chrono>
-
-std::chrono::time_point<std::chrono::high_resolution_clock> g_clock_start;
-
 #if defined(FEATURE_APPHOST)
 #include "cli/apphost/bundle/bundle_runner.h"
 #include "cli/apphost/bundle/marker.h"
@@ -188,6 +184,8 @@ int exe_start(const int argc, const pal::char_t* argv[])
         return StatusCode::CoreHostLibMissingFailure;
     }
 
+    trace::timestamp(_X("corehost load-hostfxr"));
+
     // Load library
     pal::dll_t fxr;
     if (!pal::load_library(&fxr_path, &fxr))
@@ -217,7 +215,8 @@ int exe_start(const int argc, const pal::char_t* argv[])
         {
             propagate_error_writer_t propagate_error_writer_to_hostfxr(set_error_writer_fn);
 
-            std::cout << "corehost: \t" << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - g_clock_start).count() << std::endl;
+            trace::timestamp(_X("corehost call-hostfxr"));
+
             rc = main_fn_v2(argc, argv, host_path_cstr, dotnet_root_cstr, app_path_cstr);
         }
     }
@@ -240,6 +239,8 @@ int exe_start(const int argc, const pal::char_t* argv[])
             hostfxr_main_fn main_fn_v1 = reinterpret_cast<hostfxr_main_fn>(pal::get_symbol(fxr, "hostfxr_main"));
             if (main_fn_v1 != nullptr)
             {
+                trace::timestamp(_X("corehost call-hostfxr"));
+
                 rc = main_fn_v1(argc, argv);
             }
             else
@@ -275,7 +276,7 @@ int main(const int argc, const pal::char_t* argv[])
 {
     trace::setup();
 
-    g_clock_start = std::chrono::high_resolution_clock::now();
+    trace::timestamp(_X("corehost wmain"));
 
     if (trace::is_enabled())
     {

@@ -18,6 +18,7 @@ namespace trace
     void error(const pal::char_t* format, ...);
     void println(const pal::char_t* format, ...);
     void println();
+    void timestamp(const pal::char_t* marker);
     void flush();
 
     typedef void (*error_writer_fn)(const pal::char_t* message);

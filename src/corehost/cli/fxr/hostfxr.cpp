@@ -15,10 +15,6 @@
 #include "hostfxr.h"
 #include "host_context.h"
 
-#include <chrono>
-
-std::chrono::time_point<std::chrono::high_resolution_clock> g_clock_start;
-
 namespace
 {
     void trace_hostfxr_entry_point(const pal::char_t *entry_point)
@@ -31,7 +27,7 @@ namespace
 SHARED_API int HOSTFXR_CALLTYPE hostfxr_main_startupinfo(const int argc, const pal::char_t* argv[], const pal::char_t* host_path, const pal::char_t* dotnet_root, const pal::char_t* app_path)
 {
     trace_hostfxr_entry_point(_X("hostfxr_main_startupinfo"));
-    g_clock_start = std::chrono::high_resolution_clock::now();
+    trace::timestamp(_X("hostfxr hostfxr_main_startupinfo"));
 
     host_startup_info_t startup_info(host_path, dotnet_root, app_path);
 
@@ -41,7 +37,7 @@ SHARED_API int HOSTFXR_CALLTYPE hostfxr_main_startupinfo(const int argc, const p
 SHARED_API int HOSTFXR_CALLTYPE hostfxr_main(const int argc, const pal::char_t* argv[])
 {
     trace_hostfxr_entry_point(_X("hostfxr_main"));
-    g_clock_start = std::chrono::high_resolution_clock::now();
+    trace::timestamp(_X("hostfxr hostfxr_main"));
 
     host_startup_info_t startup_info;
     startup_info.parse(argc, argv);
