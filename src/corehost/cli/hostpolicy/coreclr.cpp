@@ -110,6 +110,8 @@ pal::hresult_t coreclr_t::create(
     };
     properties.enumerate(callback);
 
+    trace::timestamp(_X("hostpolicy call-coreclr-initialize"));
+
     pal::hresult_t hr;
     hr = coreclr_initialize(
         exe_path,
