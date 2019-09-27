@@ -2,6 +2,8 @@
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), TestProjects.props))\TestProjects.props" />
 
   <PropertyGroup>
+    <TargetFramework>$(NETCoreAppFramework)</TargetFramework>
+    <RuntimeFrameworkVersion>$(MNAVersion)</RuntimeFrameworkVersion>
     <RestorePackagesPath>$(TestRestorePackagesPath)</RestorePackagesPath>
     <RestoreNoCache>true</RestoreNoCache>
   </PropertyGroup>
